@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SpamShield — AI Spam Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+<style>
+  /* ── Reset & Variables ─────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:         #0a0a0f;
+    --surface:    #111118;
+    --border:     #1e1e2e;
+    --accent:     #ff3c6e;
+    --accent2:    #00d4ff;
+    --safe:       #00e676;
+    --warn:       #ff3c6e;
+    --text:       #e8e8f0;
+    --muted:      #6b6b85;
+    --glow-r:     rgba(255,60,110,0.25);
+    --glow-b:     rgba(0,212,255,0.18);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background grid ───────────────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,60,110,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,60,110,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────── */
+  .page { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+
+  /* ── Header ────────────────────────────────────────────────────── */
+  header { text-align: center; margin-bottom: 3rem; animation: fadeDown 0.7s ease both; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: .5rem;
+    background: rgba(255,60,110,0.1); border: 1px solid rgba(255,60,110,0.3);
+    color: var(--accent); font-family: 'Space Mono', monospace;
+    font-size: .7rem; letter-spacing: .1em; padding: .35rem .8rem;
+    border-radius: 2rem; margin-bottom: 1.2rem;
+  }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1.6s ease infinite; }
+
+  h1 {
+    font-size: clamp(2.4rem, 6vw, 3.6rem);
+    font-weight: 800;
+    letter-spacing: -.04em;
+    line-height: 1;
+    background: linear-gradient(135deg, #fff 30%, var(--accent2) 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: .6rem;
+  }
+
+  .tagline { color: var(--muted); font-size: 1rem; font-weight: 400; }
+
+  /* ── Card ──────────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .card-title {
+    font-size: .75rem; font-family: 'Space Mono', monospace;
+    letter-spacing: .12em; color: var(--muted);
+    text-transform: uppercase; margin-bottom: 1rem;
+  }
+
+  /* ── Textarea ──────────────────────────────────────────────────── */
+  .textarea-wrap { position: relative; }
+
+  textarea {
+    width: 100%; min-height: 160px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: .9rem;
+    line-height: 1.6;
+    padding: 1rem 1.1rem;
+    resize: vertical;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  textarea:focus {
+    border-color: var(--accent2);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.12);
+  }
+  textarea::placeholder { color: var(--muted); }
+
+  .char-count {
+    position: absolute; bottom: .6rem; right: .8rem;
+    font-family: 'Space Mono', monospace; font-size: .7rem;
+    color: var(--muted);
+  }
+  .char-count.warn { color: var(--warn); }
+
+  /* ── Actions ───────────────────────────────────────────────────── */
+  .actions { display: flex; gap: .75rem; margin-top: 1rem; flex-wrap: wrap; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: .5rem;
+    padding: .75rem 1.4rem; border-radius: 8px; font-family: 'Syne', sans-serif;
+    font-size: .9rem; font-weight: 600; cursor: pointer;
+    border: none; transition: all 0.2s; white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 4px 20px var(--glow-r);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #ff1f5a;
+    box-shadow: 0 6px 28px rgba(255,60,110,0.45);
+    transform: translateY(-1px);
+  }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+  .btn-ghost {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+  /* ── Quick examples ────────────────────────────────────────────── */
+  .examples { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; }
+  .example-chip {
+    font-size: .75rem; padding: .3rem .75rem; border-radius: 2rem;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer; font-family: 'Space Mono', monospace;
+    transition: all 0.15s;
+  }
+  .example-chip:hover { color: var(--text); border-color: var(--accent2); }
+
+  /* ── Result panel ──────────────────────────────────────────────── */
+  #result-panel { display: none; animation: fadeUp 0.45s ease both; }
+
+  .verdict {
+    display: flex; align-items: center; gap: 1rem;
+    padding: 1.2rem 1.4rem;
+    border-radius: 10px; margin-bottom: 1.5rem;
+    border: 1px solid;
+  }
+  .verdict.spam  { background: rgba(255,60,110,0.08); border-color: rgba(255,60,110,0.3); }
+  .verdict.safe  { background: rgba(0,230,118,0.07); border-color: rgba(0,230,118,0.3); }
+
+  .verdict-icon { font-size: 2rem; line-height: 1; }
+
+  .verdict-label {
+    font-size: 1.4rem; font-weight: 800; letter-spacing: -.03em;
+  }
+  .verdict.spam .verdict-label { color: var(--warn); }
+  .verdict.safe .verdict-label { color: var(--safe); }
+
+  .verdict-sub { font-size: .85rem; color: var(--muted); margin-top: .1rem; }
+
+  /* ── Confidence bar ────────────────────────────────────────────── */
+  .conf-section { margin-bottom: 1.5rem; }
+  .conf-label { display: flex; justify-content: space-between; font-size: .8rem; color: var(--muted); margin-bottom: .4rem; }
+  .conf-label span:last-child { font-family: 'Space Mono', monospace; }
+
+  .bar-track {
+    height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 4px; transition: width 0.8s cubic-bezier(.4,0,.2,1);
+    width: 0;
+  }
+  .bar-fill.spam { background: linear-gradient(90deg, #ff3c6e, #ff7aa2); }
+  .bar-fill.safe { background: linear-gradient(90deg, #00e676, #69ffad); }
+
+  /* ── Stats grid ────────────────────────────────────────────────── */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; margin-bottom: 1.5rem; }
+
+  .stat {
+    background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+    border-radius: 10px; padding: .9rem 1rem; text-align: center;
+  }
+  .stat-val { font-size: 1.5rem; font-weight: 800; font-family: 'Space Mono', monospace; }
+  .stat-key { font-size: .7rem; color: var(--muted); letter-spacing: .06em; margin-top: .15rem; }
+
+  /* ── Signals ───────────────────────────────────────────────────── */
+  .signals-list { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .signal-tag {
+    font-size: .75rem; font-family: 'Space Mono', monospace;
+    padding: .25rem .7rem; border-radius: 4px;
+  }
+  .signal-tag.bad  { background: rgba(255,60,110,0.15); color: #ff7aa2; border: 1px solid rgba(255,60,110,0.25); }
+  .signal-tag.good { background: rgba(0,230,118,0.1);  color: #69ffad; border: 1px solid rgba(0,230,118,0.2); }
+  .signal-tag.neutral { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ── Proba bars ────────────────────────────────────────────────── */
+  .proba-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; }
+  .proba-label { font-size: .8rem; font-family: 'Space Mono', monospace; width: 45px; }
+  .proba-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .proba-fill { height: 100%; border-radius: 3px; transition: width 0.9s cubic-bezier(.4,0,.2,1); width: 0; }
+  .proba-fill.spam { background: var(--warn); }
+  .proba-fill.ham  { background: var(--safe); }
+  .proba-num { font-size: .75rem; font-family: 'Space Mono', monospace; color: var(--muted); width: 38px; text-align: right; }
+
+  /* ── Error ─────────────────────────────────────────────────────── */
+  .error-box {
+    display: none; align-items: center; gap: .75rem;
+    background: rgba(255,60,110,0.08); border: 1px solid rgba(255,60,110,0.25);
+    border-radius: 10px; padding: 1rem 1.2rem; color: #ff7aa2;
+    font-size: .9rem; margin-top: 1rem;
+  }
+
+  /* ── Loading ───────────────────────────────────────────────────── */
+  .spinner {
+    display: none; width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  /* ── How it works ──────────────────────────────────────────────── */
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem; }
+
+  .step {
+    background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.1rem; animation: fadeUp 0.6s ease both;
+  }
+  .step:nth-child(2) { animation-delay: .1s; }
+  .step:nth-child(3) { animation-delay: .2s; }
+  .step:nth-child(4) { animation-delay: .3s; }
+
+  .step-num {
+    font-family: 'Space Mono', monospace; font-size: .7rem;
+    color: var(--accent); margin-bottom: .5rem; letter-spacing: .1em;
+  }
+  .step-title { font-size: .9rem; font-weight: 600; margin-bottom: .3rem; }
+  .step-desc { font-size: .78rem; color: var(--muted); line-height: 1.5; }
+
+  /* ── Footer ────────────────────────────────────────────────────── */
+  footer {
+    text-align: center; margin-top: 3rem;
+    font-size: .75rem; color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ── Keyframes ─────────────────────────────────────────────────── */
+  @keyframes fadeDown { from { opacity:0; transform:translateY(-20px); } to { opacity:1; transform:none; } }
+  @keyframes fadeUp   { from { opacity:0; transform:translateY(20px);  } to { opacity:1; transform:none; } }
+  @keyframes pulse    { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+  @keyframes spin     { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header>
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Powered by scikit-learn
+    </div>
+    <h1>SpamShield</h1>
+    <p class="tagline">AI-powered spam detection using Naive Bayes &amp; TF-IDF</p>
+  </header>
+
+  <!-- Input card -->
+  <div class="card" style="animation-delay:.1s">
+
+    <div class="textarea-wrap">
+      <textarea id="msg-input" placeholder="Paste a message, email, or SMS here to check if it's spam..."
+                maxlength="2000"></textarea>
+      <span class="char-count" id="char-count">0 / 2000</span>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="analyze-btn" onclick="analyze()">
+        <span class="spinner" id="spinner"></span>
+        <span id="btn-text">🔍 Analyze</span>
+      </button>
+      <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
+    </div>
+
+    <div class="examples">
+      <span style="font-size:.75rem; color:var(--muted); align-self:center; font-family:'Space Mono',monospace;">try:</span>
+      <span class="example-chip" onclick="loadExample('spam1')">🚨 spam sample</span>
+      <span class="example-chip" onclick="loadExample('ham1')">✅ normal message</span>
+      <span class="example-chip" onclick="loadExample('spam2')">💸 prize scam</span>
+      <span class="example-chip" onclick="loadExample('ham2')">📅 meeting invite</span>
+    </div>
+
+    <div class="error-box" id="error-box">
+      ⚠️ <span id="error-msg">Could not connect to the backend. Make sure Flask is running on port 5000.</span>
+    </div>
+  </div>
+
+  <!-- Result panel -->
+  <div id="result-panel">
+    <div class="card">
+
+      <!-- Verdict -->
+      <div class="verdict" id="verdict">
+        <div class="verdict-icon" id="verdict-icon"></div>
+        <div>
+          <div class="verdict-label" id="verdict-label"></div>
+          <div class="verdict-sub" id="verdict-sub"></div>
+        </div>
+      </div>
+
+      <!-- Confidence bar -->
+      <div class="conf-section">
+        <div class="conf-label">
+          <span>Confidence</span>
+          <span id="conf-pct"></span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" id="conf-bar"></div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-val" id="stat-words">—</div>
+          <div class="stat-key">WORDS</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="stat-caps">—</div>
+          <div class="stat-key">CAPS WORDS</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val" id="stat-excl">—</div>
+          <div class="stat-key">EXCLAMATIONS</div>
+        </div>
+      </div>
+
+      <!-- Probability bars -->
+      <div class="card-title">// Probabilities</div>
+      <div style="margin-bottom:1.5rem">
+        <div class="proba-row">
+          <span class="proba-label" style="color:var(--warn)">SPAM</span>
+          <div class="proba-track"><div class="proba-fill spam" id="spam-bar"></div></div>
+          <span class="proba-num" id="spam-pct"></span>
+        </div>
+        <div class="proba-row">
+          <span class="proba-label" style="color:var(--safe)">HAM</span>
+          <div class="proba-track"><div class="proba-fill ham" id="ham-bar"></div></div>
+          <span class="proba-num" id="ham-pct"></span>
+        </div>
+      </div>
+
+      <!-- Signals -->
+      <div class="card-title">// Detected signals</div>
+      <div class="signals-list" id="signals-list"></div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="card" style="animation-delay:.2s">
+    <div class="card-title">How it works</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">STEP 01</div>
+        <div class="step-title">TF-IDF Vectorization</div>
+        <div class="step-desc">Text is converted into numerical features — words and word-pairs are scored by frequency and rarity.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">STEP 02</div>
+        <div class="step-title">Naive Bayes</div>
+        <div class="step-desc">Applies Bayes' theorem: calculates probability of spam vs ham given the feature vector.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">STEP 03</div>
+        <div class="step-title">Flask API</div>
+        <div class="step-desc">Python backend serves predictions via a REST endpoint. Frontend calls POST /predict.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">STEP 04</div>
+        <div class="step-title">Signal Analysis</div>
+        <div class="step-desc">Extra heuristics (keywords, URLs, caps) explain the model's reasoning in plain language.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>SpamShield · scikit-learn + Flask + Vanilla JS · Built for learning</footer>
+</div>
+
+<script>
+const EXAMPLES = {
+  spam1: "CONGRATULATIONS! You've been selected as today's lucky winner! Click here to claim your FREE $500 Amazon gift card NOW before it expires!!!",
+  ham1:  "Hey, just wanted to confirm our coffee meeting tomorrow at 10am. See you at the usual place!",
+  spam2: "You have WON a luxury vacation package worth $5000! Call 1-800-555-0123 immediately to claim your prize. Limited time offer!",
+  ham2:  "Hi team, the quarterly review meeting is scheduled for Friday at 2pm. Please review the attached agenda beforehand.",
+};
+
+const input   = document.getElementById("msg-input");
+const charEl  = document.getElementById("char-count");
+
+// Character counter
+input.addEventListener("input", () => {
+  const n = input.value.length;
+  charEl.textContent = `${n} / 2000`;
+  charEl.classList.toggle("warn", n > 1800);
+});
+
+function loadExample(key) {
+  input.value = EXAMPLES[key];
+  input.dispatchEvent(new Event("input"));
+  input.focus();
+}
+
+function clearAll() {
+  input.value = "";
+  input.dispatchEvent(new Event("input"));
+  document.getElementById("result-panel").style.display = "none";
+  document.getElementById("error-box").style.display   = "none";
+}
+
+function setLoading(on) {
+  document.getElementById("spinner").style.display = on ? "block" : "none";
+  document.getElementById("btn-text").textContent   = on ? "Analyzing…" : "🔍 Analyze";
+  document.getElementById("analyze-btn").disabled   = on;
+}
+
+async function analyze() {
+  const text = input.value.trim();
+  if (!text) { input.focus(); return; }
+
+  setLoading(true);
+  document.getElementById("error-box").style.display   = "none";
+  document.getElementById("result-panel").style.display = "none";
+
+  try {
+    const res  = await fetch("http://localhost:5000/predict", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ text }),
+    });
+
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    const data = await res.json();
+    renderResult(data);
+
+  } catch (err) {
+    document.getElementById("error-box").style.display = "flex";
+    document.getElementById("error-msg").textContent   =
+      "Could not connect to the backend. Make sure Flask is running: python app.py";
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderResult(d) {
+  const panel   = document.getElementById("result-panel");
+  const isSpam  = d.is_spam;
+
+  // Verdict
+  const verdict = document.getElementById("verdict");
+  verdict.className = `verdict ${isSpam ? "spam" : "safe"}`;
+  document.getElementById("verdict-icon").textContent  = isSpam ? "🚨" : "✅";
+  document.getElementById("verdict-label").textContent = isSpam ? "SPAM DETECTED" : "LOOKS SAFE";
+  document.getElementById("verdict-sub").textContent   =
+    isSpam
+      ? `${d.confidence}% confident this is spam`
+      : `${d.confidence}% confident this is not spam`;
+
+  // Confidence bar
+  document.getElementById("conf-pct").textContent = `${d.confidence}%`;
+  const confBar = document.getElementById("conf-bar");
+  confBar.className = `bar-fill ${isSpam ? "spam" : "safe"}`;
+  setTimeout(() => confBar.style.width = `${d.confidence}%`, 50);
+
+  // Stats
+  document.getElementById("stat-words").textContent = d.word_count;
+  document.getElementById("stat-caps").textContent  = d.signals.all_caps_count;
+  document.getElementById("stat-excl").textContent  = d.signals.exclamation_count;
+
+  // Probability bars
+  setTimeout(() => {
+    document.getElementById("spam-bar").style.width = `${d.spam_prob}%`;
+    document.getElementById("ham-bar").style.width  = `${d.ham_prob}%`;
+  }, 100);
+  document.getElementById("spam-pct").textContent = `${d.spam_prob}%`;
+  document.getElementById("ham-pct").textContent  = `${d.ham_prob}%`;
+
+  // Signals
+  const sigList = document.getElementById("signals-list");
+  sigList.innerHTML = "";
+
+  d.signals.keywords_found.forEach(kw => {
+    sigList.innerHTML += `<span class="signal-tag bad">keyword: ${kw}</span>`;
+  });
+  if (d.signals.has_url)
+    sigList.innerHTML += `<span class="signal-tag bad">contains URL</span>`;
+  if (d.signals.has_phone)
+    sigList.innerHTML += `<span class="signal-tag bad">phone number</span>`;
+  if (d.signals.dollar_signs > 0)
+    sigList.innerHTML += `<span class="signal-tag bad">$ signs: ${d.signals.dollar_signs}</span>`;
+  if (d.signals.all_caps_count > 1)
+    sigList.innerHTML += `<span class="signal-tag bad">excessive caps</span>`;
+  if (d.signals.exclamation_count > 2)
+    sigList.innerHTML += `<span class="signal-tag bad">many exclamations</span>`;
+
+  if (!isSpam) {
+    sigList.innerHTML += `<span class="signal-tag good">normal language</span>`;
+    sigList.innerHTML += `<span class="signal-tag good">no suspicious patterns</span>`;
+  }
+
+  if (sigList.innerHTML === "")
+    sigList.innerHTML = `<span class="signal-tag neutral">no specific signals found</span>`;
+
+  panel.style.display = "block";
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Allow Ctrl+Enter to submit
+input.addEventListener("keydown", e => {
+  if (e.ctrlKey && e.key === "Enter") analyze();
+});
+</script>
+</body>
+</html>
