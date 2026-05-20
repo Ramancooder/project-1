@@ -12,7 +12,7 @@ import re
 import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-
+from flask import Flask, request, jsonify, render_template
 # ── App setup ─────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 CORS(app)   # allow requests from the frontend (different port)
@@ -51,7 +51,9 @@ def extract_signals(text: str) -> dict:
         "exclamation_count": exclamations,
         "dollar_signs": dollar_signs,
     }
-
+@app.route('/')
+def home():
+    return render_template('index.html')
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/health", methods=["GET"])
 def health():
