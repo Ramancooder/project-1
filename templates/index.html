@@ -408,6 +408,7 @@
 </div>
 
 <script>
+const API_URL = "https://project-1-2-m4zs.onrender.com";
 const EXAMPLES = {
   spam1: "CONGRATULATIONS! You've been selected as today's lucky winner! Click here to claim your FREE $500 Amazon gift card NOW before it expires!!!",
   ham1:  "Hey, just wanted to confirm our coffee meeting tomorrow at 10am. See you at the usual place!",
@@ -453,7 +454,7 @@ async function analyze() {
   document.getElementById("result-panel").style.display = "none";
 
   try {
-    const res  = await fetch("https://project-1-2-m4zs.onrender.com/predict", {
+    const res = await fetch(`${API_URL}/predict`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ text }),
